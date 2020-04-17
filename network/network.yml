@@ -1,8 +1,8 @@
 Description: >
-  Goodhope Ordu - Udagram Project
+  Goodhope Ordu - AWS Project
 
-  This is the network infrastructure template for an Instagram clone
-  app called Udagram. It spreads private and public subnets accross
+  This is the network infrastructure template. 
+  It spreads private and public subnets accross
   two availability zones, and deploys the necessary network resources.
 
 Parameters:
