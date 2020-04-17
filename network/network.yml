@@ -1,0 +1,260 @@
+Description: >
+  Goodhope Ordu - Udagram Project
+
+  This is the network infrastructure template for an Instagram clone
+  app called Udagram. It spreads private and public subnets accross
+  two availability zones, and deploys the necessary network resources.
+
+Parameters:
+  EnvironmentName:
+    Description: An environment name that will be prefixed to resource names
+    Type: String
+
+  VpcCIDR:
+    Description: Please enter the IP range for this VPC
+    Type: String
+    Default: 10.0.0.0/16
+
+  PublicSubnet1CIDR:
+    Description: Please enter the IP range for the public subnet in the first Availability Zone
+    Type: String
+    Default: 10.0.0.0/24
+
+  PublicSubnet2CIDR:
+    Description: Please enter the IP range for the public subnet in the second Availability Zone
+    Type: String
+    Default: 10.0.1.0/24
+
+  PrivateSubnet1CIDR:
+    Description: Please enter the IP range for the private subnet in the first Availability Zone
+    Type: String
+    Default: 10.0.2.0/24
+
+  PrivateSubnet2CIDR:
+    Description: Please enter the IP range for the private subnet in the second Availability Zone
+    Type: String
+    Default: 10.0.3.0/24
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties: 
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties: 
+      Tags: 
+        - Key: Name
+          Value: !Ref EnvironmentName
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: 
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+      
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags: 
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-public-subnet-AZ1
+      VpcId: !Ref VPC
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnet2CIDR
+      MapPublicIpOnLaunch: true
+      Tags: 
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-public-subnet-AZ2
+      VpcId: !Ref VPC
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      MapPublicIpOnLaunch: false
+      Tags: 
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-private-subnet-AZ1
+      VpcId: !Ref VPC
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      MapPublicIpOnLaunch: false
+      Tags: 
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-private-subnet-AZ2
+      VpcId: !Ref VPC
+
+  NATGatewayEIP1:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties: 
+      Domain: vpc
+
+  NATGatewayEIP2:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties: 
+      Domain: vpc
+
+  NATGateway1:
+    Type: AWS::EC2::NatGateway
+    Properties: 
+      AllocationId: !GetAtt NATGatewayEIP1.AllocationId
+      SubnetId: !Ref PublicSubnet1
+      Tags: 
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-NAT-gateway-AZ1
+
+  NATGateway2:
+    Type: AWS::EC2::NatGateway
+    Properties: 
+      AllocationId: !GetAtt NATGatewayEIP2.AllocationId
+      SubnetId: !Ref PublicSubnet2
+      Tags: 
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-NAT-gateway-AZ2
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      Tags: 
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-public-routetable
+      VpcId: !Ref VPC
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties: 
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref PublicRouteTable
+
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+
+  PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      Tags: 
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-private-routetable-1
+      VpcId: !Ref VPC
+
+  DefaultPrivateRoute1:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties: 
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGateway1
+      RouteTableId: !Ref PrivateRouteTable1
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref PrivateRouteTable1
+      SubnetId: !Ref PrivateSubnet1
+
+  PrivateRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      Tags: 
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-private-routetable-2
+      VpcId: !Ref VPC
+
+  DefaultPrivateRoute2:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties: 
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGateway2
+      RouteTableId: !Ref PrivateRouteTable2
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref PrivateRouteTable2
+      SubnetId: !Ref PrivateSubnet2
+
+  ControlPlaneSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Cluster communication with worker nodes
+      VpcId: !Ref VPC
+
+Outputs:
+
+  VPC: 
+    Description: A reference to the created VPC
+    Value: !Ref VPC
+    Export:
+      Name: !Sub ${EnvironmentName}-VPCID
+
+  PublicSubnets:
+      Description: A list of the public subnets
+      Value: !Join [ ",", [ !Ref PublicSubnet1, !Ref PublicSubnet2 ]]
+      Export:
+        Name: !Sub ${EnvironmentName}-PUB-SUBNETS
+
+  PrivateSubnets:
+      Description: A list of the private subnets
+      Value: !Join [ ",", [ !Ref PrivateSubnet1, !Ref PrivateSubnet2 ]]
+      Export:
+        Name: !Sub ${EnvironmentName}-PRIV-SUBNETS
+
+  PublicSubnet1:
+      Description: A reference to the private subnet in the 1st Availability Zone
+      Value: !Ref PrivateSubnet1
+      Export:
+        Name: !Sub ${EnvironmentName}-PRIV1-SN
+
+  PublicSubnet2: 
+      Description: A reference to the private subnet in the 2nd Availability Zone
+      Value: !Ref PrivateSubnet2
+      Export:
+        Name: !Sub ${EnvironmentName}-PRIV2-SN
+
+  PublicSubnet1:
+      Description: A reference to the public subnet in the 1st Availability Zone
+      Value: !Ref PublicSubnet1
+      Export:
+        Name: !Sub ${EnvironmentName}-PUB1-SN
+
+  PublicSubnet2: 
+      Description: A reference to the public subnet in the 2nd Availability Zone
+      Value: !Ref PublicSubnet2
+      Export:
+        Name: !Sub ${EnvironmentName}-PUB2-SN
+  
+  SecurityGroups:
+    Description: Security group for the cluster control plane communication with worker nodes
+    Value: !Join [ ",", [ !Ref ControlPlaneSecurityGroup ] ]
