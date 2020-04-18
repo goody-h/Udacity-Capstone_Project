@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Create Amazon EKS Cluster & Node Group
+
+Parameters:
+  NetworkStackName:
+    Description: The stack name for the network configuration used
+    Type: String
+
+  WorkerNodeType:
+    Description: worker node instance
+    Type: String
+    Default: t2.small
+
+  RemoteAccessKey:
+    Description: SSH key for accessing the worker nodes
+    Type: String
+
+
+Mappings:
+  ServicePrincipals:
+    aws-cn:
+      ec2: ec2.amazonaws.com.cn
+    aws:
+      ec2: ec2.amazonaws.com
+  
+
+Resources:
+  eksClusterRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - eks.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+
+  NodeInstanceRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - !FindInMap [ServicePrincipals, !Ref "AWS::Partition", ec2]
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEKS_CNI_Policy"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+      Path: /
+
+  eksCluster:
+    Type: AWS::EKS::Cluster
+    Properties: 
+      Name: !Ref AWS::StackName
+      ResourcesVpcConfig: 
+        SecurityGroupIds: 
+          Fn::Split: 
+            - "," 
+            - Fn::ImportValue: !Sub "${NetworkStackName}-SecurityGroups"
+        SubnetIds: 
+          Fn::Split:
+            - "," 
+            - Fn::ImportValue: !Sub "${NetworkStackName}-SubnetIds"
+      RoleArn: !GetAtt eksClusterRole.Arn
+      Version: '1.15'
+
+  eksNodeGroup:
+    Type: AWS::EKS::Nodegroup
+    DependsOn: eksCluster
+    Properties: 
+      ClusterName: !Ref AWS::StackName
+      InstanceTypes: 
+        - !Ref WorkerNodeType
+      NodegroupName: !Sub ${AWS::StackName}-ng1
+      NodeRole: !GetAtt NodeInstanceRole.Arn
+      RemoteAccess: 
+        Ec2SshKey: !Ref RemoteAccessKey
+      ScalingConfig: 
+        DesiredSize: 1
+        MaxSize: 1
+        MinSize: 1
+      Subnets: 
+        - Fn::Select:
+            - 2 
+            - Fn::Split: 
+                - "," 
+                - Fn::ImportValue: !Sub "${NetworkStackName}-SubnetIds"
+        - Fn::Select:
+            - 3 
+            - Fn::Split: 
+                - "," 
+                - Fn::ImportValue: !Sub "${NetworkStackName}-SubnetIds"
+
+Outputs:
+  RoleArn:
+    Description: The role that Amazon EKS will use to create AWS resources for Kubernetes clusters
+    Value: !GetAtt eksClusterRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-EksRoleArn"
+
+  NodeInstanceRole:
+    Description: The node instance role
+    Value: !GetAtt NodeInstanceRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-NgRoleArn"
+    
+  EKS: 
+    Description: EKS Cluster
+    Value: !Ref eksCluster  
