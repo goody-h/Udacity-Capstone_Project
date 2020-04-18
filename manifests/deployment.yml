@@ -1,0 +1,22 @@
+apiVersion : apps/v1beta1
+kind: Deployment
+metadata:
+  name: capstoneproject 
+spec:
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: capstoneproject 
+    spec:
+      containers:
+        - name: capstoneproject 
+          image: goodhopeordu/capstoneproject:stable
+          ports:
+          - containerPort: 80
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  minReadySeconds: 10
