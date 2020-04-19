@@ -11,7 +11,7 @@ spec:
     spec:
       containers:
         - name: capstoneproject 
-          image: goodhopeordu/capstoneproject:stable
+          image: goodhopeordu/capstoneproject:v1
           ports:
           - containerPort: 80
   strategy:

@@ -10,11 +10,11 @@ pipeline {
 
 		stage('Upload docker Image') {
 			steps {
-				sh 'docker build . --tag=goodhopeordu/capstoneproject:stable'
+				sh 'docker build . --tag=goodhopeordu/capstoneproject:v1'
 				withCredentials([usernamePassword(credentialsId: 'docker', usernameVariable: 'username', passwordVariable: 'password')]) {
 					sh 'docker login -u $username -p $password'
 				}
-				sh 'docker push goodhopeordu/capstoneproject:stable'
+				sh 'docker push goodhopeordu/capstoneproject:v1'
 			}
 		}
 
