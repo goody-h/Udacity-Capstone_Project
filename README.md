@@ -3,7 +3,7 @@
 This is my final Udacity project. It provides the means of deploying a sample nginx application.
 
 ## Demo
-Load Balancer public DNS: a96038234679a4ccd90d04c539201676-951865754.us-west-2.elb.amazonaws.com
+Load Balancer public DNS: [a96038234679a4ccd90d04c539201676-951865754.us-west-2.elb.amazonaws.com](http://a96038234679a4ccd90d04c539201676-951865754.us-west-2.elb.amazonaws.com)
 
 ## Setup
 ### Jenkins setup
